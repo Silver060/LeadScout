@@ -49,6 +49,10 @@ function sourceLabel(source) {
   return source?.trafficArea || source?.filename || source?.url || "unknown source";
 }
 
+function uniqueSorted(values) {
+  return [...new Set((values || []).map((v) => String(v || "").trim()).filter(Boolean))].sort();
+}
+
 function mergeText(a, b) {
   const av = String(a || "").trim();
   const bv = String(b || "").trim();
@@ -77,12 +81,17 @@ function extractTrafficArea(filename) {
 }
 
 function normaliseRecord(record) {
+  const centreAddresses = uniqueSorted(record.centreAddresses);
+  const centres = record.centres == null
+    ? (centreAddresses.length ? centreAddresses.length : null)
+    : Number(record.centres) || 0;
   return {
     ...record,
     name: String(record.name || "").trim(),
     licence: String(record.licence || "").trim(),
     vehicles: Number(record.vehicles) || 0,
-    centres: record.centres == null ? null : Number(record.centres) || 0,
+    centres,
+    centreAddresses,
     sources: [...new Set(record.sources || [])].sort(),
     trafficAreas: [...new Set(record.trafficAreas || [])].sort(),
   };
@@ -94,11 +103,21 @@ function mergeRecord(existing, incoming) {
     licence: existing.licence || incoming.licence,
     vehicles: mergeNumber(existing.vehicles, incoming.vehicles),
     centres: mergeCentres(existing.centres, incoming.centres),
+    centreAddresses: [...(existing.centreAddresses || []), ...(incoming.centreAddresses || [])],
     sources: [...(existing.sources || []), ...(incoming.sources || [])],
     trafficAreas: [...(existing.trafficAreas || []), ...(incoming.trafficAreas || [])],
   });
+  if (merged.centreAddresses.length) {
+    merged.centres = Math.max(merged.centres || 0, merged.centreAddresses.length);
+  }
   merged.duplicate_count = (existing.duplicate_count || 0) + 1;
   return merged;
+}
+
+function numberOrNull(value) {
+  const text = String(value ?? "").replace(/,/g, "").trim();
+  if (!text || !/^\d+(\.\d+)?$/.test(text)) return null;
+  return Number(text);
 }
 
 function parseLicenceRows(text, source) {
@@ -106,7 +125,8 @@ function parseLicenceRows(text, source) {
   const header = rows[0] || [];
   const iName = col(header, "operator name", "organisation");
   const iVeh = col(header, "authorised vehicle", "vehicles authorised", "vehicle authorisation");
-  const iCentres = col(header, "operating centre", "centres");
+  const iCentres = col(header, "operating centres", "operating centre count", "centres");
+  const iCentreAddress = col(header, "oc address", "ocaddress", "operating centre address");
   const iLic = col(header, "licence number", "licence");
   if (iName < 0 || iVeh < 0 || iLic < 0) {
     throw new Error(`unrecognised CSV headers in ${sourceLabel(source)}: ${header.join(" | ")}`);
@@ -120,12 +140,23 @@ function parseLicenceRows(text, source) {
       name: r[iName],
       licence,
       vehicles: r[iVeh],
-      centres: iCentres >= 0 ? r[iCentres] : null,
+      centres: iCentres >= 0 ? numberOrNull(r[iCentres]) : null,
+      centreAddresses: iCentreAddress >= 0 ? [r[iCentreAddress]] : [],
       sources: [source.filename || source.url || sourceLabel(source)],
       trafficAreas: source.trafficArea ? [source.trafficArea] : [],
     }));
   }
-  return { records: parsed, rowCount: Math.max(0, rows.length - 1) };
+  return {
+    records: parsed,
+    rowCount: Math.max(0, rows.length - 1),
+    columns: {
+      licence: iLic >= 0 ? header[iLic] : null,
+      operator: iName >= 0 ? header[iName] : null,
+      vehicles: iVeh >= 0 ? header[iVeh] : null,
+      centres: iCentres >= 0 ? header[iCentres] : null,
+      centreAddress: iCentreAddress >= 0 ? header[iCentreAddress] : null,
+    },
+  };
 }
 
 function combineRecords(parts) {
@@ -149,7 +180,7 @@ function combineRecords(parts) {
   return { current, totalRows, duplicateCount };
 }
 
-export function loadFromDirectory(dir) {
+function csvFilesInDirectory(dir) {
   const resolvedDir = resolve(dir);
   if (!existsSync(resolvedDir)) {
     throw new Error(`OLICENCE_CSV_DIR does not exist: ${resolvedDir}`);
@@ -165,7 +196,51 @@ export function loadFromDirectory(dir) {
   if (!files.length) {
     throw new Error(`no CSV files found in OLICENCE_CSV_DIR: ${resolvedDir}`);
   }
+  return { resolvedDir, files };
+}
 
+export function inspectDirectory(dir, { strict = false } = {}) {
+  const { resolvedDir, files } = csvFilesInDirectory(dir);
+  const parts = [];
+  const fileSummaries = [];
+  const rejectedFiles = [];
+  for (const filename of files) {
+    const path = join(resolvedDir, filename);
+    let text;
+    try {
+      text = readFileSync(path, "utf8");
+      const parsed = parseLicenceRows(text, {
+        filename,
+        trafficArea: extractTrafficArea(filename),
+      });
+      parts.push(parsed);
+      fileSummaries.push({
+        filename,
+        trafficArea: extractTrafficArea(filename),
+        rows: parsed.rowCount,
+        columns: parsed.columns,
+      });
+    } catch (e) {
+      const rejected = { filename, error: e.message };
+      rejectedFiles.push(rejected);
+      if (strict) throw new Error(`${filename}: ${e.message}`);
+    }
+  }
+  if (!parts.length) {
+    throw new Error(`no readable O-licence CSV files with recognised headers in ${resolvedDir}`);
+  }
+  return {
+    ...combineRecords(parts),
+    fileCount: files.length,
+    mode: "local",
+    directory: resolvedDir,
+    fileSummaries,
+    rejectedFiles,
+  };
+}
+
+export function loadFromDirectory(dir) {
+  const { resolvedDir, files } = csvFilesInDirectory(dir);
   const parts = files.map((filename) => {
     const path = join(resolvedDir, filename);
     let text;
@@ -180,10 +255,15 @@ export function loadFromDirectory(dir) {
     });
   });
 
-  return { ...combineRecords(parts), fileCount: files.length, mode: "local", directory: resolvedDir };
+  return { ...combineRecords(parts), fileCount: files.length, mode: "local", directory: resolvedDir, fileSummaries: parts.map((part, i) => ({
+    filename: files[i],
+    trafficArea: extractTrafficArea(files[i]),
+    rows: part.rowCount,
+    columns: part.columns,
+  })), rejectedFiles: [] };
 }
 
-async function loadFromUrl(url) {
+export async function loadFromUrl(url) {
   let text;
   try {
     const res = await fetch(url);
