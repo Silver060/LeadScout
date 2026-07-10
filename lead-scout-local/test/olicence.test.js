@@ -9,12 +9,12 @@ test("offline O-licence regional CSVs merge duplicate licences and keep growth s
   const dir = mkdtempSync(join(tmpdir(), "leadscout-olicence-"));
   try {
     writeFileSync(join(dir, "North-East.csv"), [
-      "Licence Number,Operator Name,Authorised Vehicles,Operating Centres",
+      "LicenceNumber,OperatorName,NumberOfVehiclesAuthorised,OperatingCentres",
       "OB1234567,Acme Haulage Ltd,7,1",
       "OB7654321,Other Transport Ltd,2,1",
     ].join("\n"));
     writeFileSync(join(dir, "north-west.CSV"), [
-      "Licence Number,Operator Name,Authorised Vehicles,Operating Centres",
+      "LicenceNumber,OperatorName,NumberOfVehiclesAuthorised,OperatingCentres",
       "OB1234567,Acme Haulage Limited,9,2",
     ].join("\n"));
 
