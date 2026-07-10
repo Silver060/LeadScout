@@ -73,12 +73,23 @@ Web search is now the *third* signal source, not the only one:
    Configure SIC codes in `config/client.json` → `companiesHouse.sicCodes`
    (49410 = road freight; 52290 = other transport support; 52241 = cargo handling).
 
-2. **DVSA O-licence register** (`OLICENCE_CSV_URL` in .env). Downloads the published
-   operator-licence CSV weekly and diffs it against last week's snapshot
-   (`data/olicence-snapshot.json`). Emits: authorised fleet increases (default
-   threshold +3 vehicles, see `olicence.minVehicleIncrease`) and new operating
-   centres — i.e. fleet expansion and new depots as official data, before any
-   press release. First run only saves the snapshot; diffs start the second week.
+2. **DVSA O-licence register** (`OLICENCE_CSV_DIR` in .env, preferred). Reads
+   offline regional operator-licence CSV files from a local folder, combines them
+   into one current dataset, and diffs that against last week's snapshot
+   (`data/olicence-snapshot.json`). Use:
+
+   ```
+   OLICENCE_CSV_DIR=C:/path/to/olicence-csv
+   ```
+
+   Replace the regional CSV files in that folder weekly, but keep
+   `data/olicence-snapshot.json` so LeadScout can compare this week against the
+   previous snapshot. Emits: authorised fleet increases (default threshold +3
+   vehicles, see `olicence.minVehicleIncrease`) and new operating centres —
+   i.e. fleet expansion and new depots as official data, before any press
+   release. First run only saves the snapshot; diffs start the second week.
+   `OLICENCE_CSV_URL` remains as a backwards-compatible fallback when
+   `OLICENCE_CSV_DIR` is blank.
 
 3. **Brave web search** — unchanged, now mainly catches contract wins, awards,
    and event appearances that registers can't see.
