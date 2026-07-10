@@ -35,9 +35,11 @@ export function parseCsv(text) {
 
 // Column names in the published CSVs vary slightly; match loosely.
 function col(header, ...names) {
-  const lower = header.map((h) => h.toLowerCase().trim());
+  const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const lower = header.map((h) => norm(h));
   for (const n of names) {
-    const i = lower.findIndex((h) => h.includes(n));
+    const needle = norm(n);
+    const i = lower.findIndex((h) => h.includes(needle));
     if (i >= 0) return i;
   }
   return -1;
