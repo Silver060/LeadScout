@@ -10,7 +10,11 @@ built into Node — nothing to install). Back it up by copying that file.
 ## Requirements
 
 - Node.js 22 or newer (https://nodejs.org — check with `node --version`)
-- An Anthropic API key, a Brave Search API key, and SMTP details
+- An Anthropic API key, a Brave Search API key, a Companies House REST API key
+  (optional but recommended), and SMTP details
+
+The tracker and SQLite database are local. Companies House, Brave,
+Anthropic/Claude, and SMTP are external services when enabled.
 
 ## Setup (once)
 
@@ -20,6 +24,10 @@ built into Node — nothing to install). Back it up by copying that file.
 4. Edit `config/client.json` (ICP, queries) and paste 2-3 of Becca's real
    emails into `config/voice-examples.md`
 
+For Companies House, create a free REST API key at
+https://developer.company-information.service.gov.uk and put it in `.env` as
+`COMPANIES_HOUSE_API_KEY=...`.
+
 ## Running
 
 ```
@@ -27,6 +35,8 @@ node agent/run.js --dry-run              # full pipeline, nothing saved, no emai
 node agent/run.js --dry-run --max-queries=2   # cheap test
 node agent/run.js                        # real run: saves to DB, emails Becca
 npm start                                # tracker at http://localhost:3000
+npm run check-sources -- --no-network    # validate local structured sources only
+npm run check-sources                    # also checks Companies House auth if key is set
 ```
 
 The tracker binds to localhost only — nobody else on your network can reach
@@ -66,8 +76,8 @@ Nothing you build or tune here is throwaway.
 
 Web search is now the *third* signal source, not the only one:
 
-1. **Companies House API** (`COMPANIES_HOUSE_API_KEY` in .env — free key, 5 min to
-   register). Emits verified, dated signals: recent director appointments/resignations
+1. **Companies House API** (`COMPANIES_HOUSE_API_KEY` in .env — free REST API key,
+   5 min to register). Emits verified, dated signals: recent director appointments/resignations
    (leadership churn → HR/leadership need) and newly registered charges (usually
    expansion/asset finance). Companies trading 15+ years get a succession-horizon tag.
    Configure SIC codes in `config/client.json` → `companiesHouse.sicCodes`
@@ -90,6 +100,12 @@ Web search is now the *third* signal source, not the only one:
    release. First run only saves the snapshot; diffs start the second week.
    `OLICENCE_CSV_URL` remains as a backwards-compatible fallback when
    `OLICENCE_CSV_DIR` is blank.
+
+Run `npm run check-sources -- --no-network` after replacing the CSVs to verify
+the local files without calling Companies House, Brave, Anthropic/Claude, Gemma,
+or SMTP. Use `npm run check-sources` when you also want a minimal Companies
+House authentication check. The diagnostic never writes leads, sends email, calls
+a language model, or overwrites `data/olicence-snapshot.json`.
 
 3. **Brave web search** — unchanged, now mainly catches contract wins, awards,
    and event appearances that registers can't see.
