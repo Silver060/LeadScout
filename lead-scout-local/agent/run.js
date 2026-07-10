@@ -42,7 +42,7 @@ async function main() {
     async function discoveryPass(scope, tierNote) {
       const structured = [
         ...(await companiesHouse.findCandidates(scope, log)),
-        ...(await olicence.findCandidates(scope, log)),
+        ...(await olicence.findCandidates(scope, log, { persist: !dryRun })),
       ];
       const { queries, results } = await runSearches(scope, log, maxQueries);
       allQueries.push(...queries);
