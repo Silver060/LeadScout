@@ -1,0 +1,89 @@
+{
+  "clientName": "Lissah & Boyle",
+  "icp": "Road freight, haulage, or logistics company; 20-250 employees; owner-operated or small leadership team; based in the UK or Ireland; led by a founder, MD, or owner; strong at logistics but struggling with growth, people, management, recruitment, branding, operations, or succession.",
+  "services": [
+    "Fractional HR and leadership development",
+    "Branding and communications",
+    "Business operations and management",
+    "Project and change management"
+  ],
+  "hardFilters": {
+    "maxEmployees": 250,
+    "minEmployees": 20,
+    "regions": [
+      "United Kingdom",
+      "Ireland",
+      "Northern Ireland"
+    ],
+    "autoRejectNameContains": [
+      "plc",
+      "group holdings"
+    ],
+    "maxSignalAgeDays": 60
+  },
+  "maxLeadsPerRun": 3,
+  "resurfaceAfterDays": 180,
+  "coreQueries": [
+    "UK haulage company wins new contract news",
+    "Ireland logistics company fleet expansion announcement",
+    "UK road freight company new depot opening",
+    "haulage company hiring transport manager UK"
+  ],
+  "rotatingQueries": [
+    "UK logistics SME award winner 2026",
+    "Northern Ireland haulage company expansion",
+    "family haulage business succession UK",
+    "logistics company rebrand UK announcement",
+    "haulage firm rapid growth hiring drivers UK",
+    "site:logistics.org.uk member news contract",
+    "site:exportandfreight.com company news",
+    "UK freight company anniversary 25 years",
+    "Multimodal exhibitor haulage SME",
+    "road transport company operations director appointment UK"
+  ],
+  "rotatingQueriesPerRun": 3,
+  "warmSignals": [
+    "Fleet expansion",
+    "New depot opening",
+    "New contract wins",
+    "Hiring transport/operations manager or director roles",
+    "Rebrand or outdated branding",
+    "Owner running business 10+ years",
+    "Rapid headcount growth",
+    "Award nominations or wins",
+    "Speaking at or attending logistics industry events"
+  ],
+  "companiesHouse": {
+    "sicCodes": [
+      "49410",
+      "52290",
+      "52241"
+    ],
+    "companiesPerRun": 20
+  },
+  "olicence": {
+    "minVehicleIncrease": 3
+  },
+  "fallbackTiers": [
+    {
+      "name": "Adjacent fleet & field operations",
+      "note": "Adjacent sector \u2014 not core logistics, but same owner-led, fleet/people-heavy profile.",
+      "icp": "Owner-led UK/Ireland SME (20-250 staff) in warehousing/3PL, courier and last-mile delivery, bus and coach operation, plant hire, construction transport, or agricultural contracting. Fleet- or crew-based, technically strong at operations but struggling with growth, people, management, recruitment, branding, or succession.",
+      "sicCodes": [
+        "52103",
+        "53201",
+        "49319",
+        "49390",
+        "77320",
+        "43999"
+      ],
+      "queries": [
+        "UK warehousing company expansion contract news",
+        "UK courier company growth hiring operations manager",
+        "bus coach operator UK new contract depot",
+        "plant hire company UK expansion hiring",
+        "agricultural contractor Ireland growth award"
+      ]
+    }
+  ]
+}

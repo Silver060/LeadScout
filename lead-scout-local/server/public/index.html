@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Scout — Lissah &amp; Boyle</title>
+<style>
+  :root{--hi:#1a7f4b;--med:#a8760a;--bg:#f6f7f8;--card:#fff;--line:#e3e5e8}
+  *{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,sans-serif;background:var(--bg);margin:0;color:#222}
+  .wrap{max-width:760px;margin:0 auto;padding:20px}
+  h1{font-size:20px}
+  .banner{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:14px;color:#555;margin-bottom:16px}
+  .banner.fail{background:#fdf3e7;border-color:#e8c9a0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+  .head{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:8px;flex-wrap:wrap}
+  .badge{font-size:12px;font-weight:600;padding:2px 10px;border-radius:12px;color:#fff}
+  .badge.high{background:var(--hi)}.badge.medium{background:var(--med)}
+  .sig{color:#444;font-size:14px;margin:6px 0 0}
+  .body{display:none;margin-top:12px;font-size:14px;line-height:1.5}
+  .card.open .body{display:block}
+  .sect{margin:10px 0}.sect b{display:block;margin-bottom:2px}
+  .unsure{background:#fdf8ec;border-radius:6px;padding:8px 10px}
+  .pitch{background:#f4f5f7;border-radius:8px;padding:12px;white-space:pre-wrap}
+  select,button,textarea{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid var(--line)}
+  button{background:#1b1b1f;color:#fff;border:none;cursor:pointer}
+  button.ghost{background:#fff;color:#1b1b1f;border:1px solid var(--line)}
+  textarea{width:100%;min-height:50px;margin-top:6px}
+  .row{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .weekhdr{font-size:13px;color:#777;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lead Scout — Lissah &amp; Boyle</h1>
+  <div class="banner" id="runbanner">Loading…</div>
+  <div id="leads"></div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const api = (path, opts = {}) =>
+  fetch(path, { ...opts, headers: { "Content-Type": "application/json" } }).then(r => r.json());
+
+function weekOf(iso){ const d=new Date(iso); const m=(d.getDay()+6)%7; d.setDate(d.getDate()-m); return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}); }
+const esc = (s) => String(s ?? "").replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+async function load() {
+  const [leads, run] = await Promise.all([api("/api/leads"), api("/api/last-run")]);
+  if (run) {
+    const when = new Date(run.started_at + "Z").toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+    if (run.status === "failed") { $("runbanner").className="banner fail"; $("runbanner").textContent = `Last run failed — check data/run-history.log. (${when})`; }
+    else $("runbanner").textContent = `Last run: ${when} · ${run.leads_accepted} lead(s) · ${run.candidates_found} considered`;
+  } else $("runbanner").textContent = "No runs yet.";
+
+  const box = $("leads"); box.innerHTML = "";
+  let lastWeek = null;
+  for (const l of leads) {
+    const wk = weekOf(l.created_at);
+    if (wk !== lastWeek) { lastWeek = wk; box.insertAdjacentHTML("beforeend", `<div class="weekhdr">Week of ${wk}</div>`); }
+    const ev = (l.evidence||[]).map(e=>`<li><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title||e.url)}</a>${e.date?` (${esc(e.date)})`:""}</li>`).join("");
+    box.insertAdjacentHTML("beforeend", `
+    <div class="card" id="c-${l.id}">
+      <div class="head" onclick="document.getElementById('c-${l.id}').classList.toggle('open')">
+        <div><strong>${esc(l.company_name)}</strong> <span class="badge ${l.confidence}">${l.confidence.toUpperCase()}</span>
+          <div class="sig">${esc(l.signal_summary)} ${l.signal_date?`— ${esc(l.signal_date)}`:""}</div></div>
+        <select onclick="event.stopPropagation()" onchange="setStatus('${l.id}',this.value)">
+          ${["new","contacted","replied","ignored"].map(s=>`<option ${s===l.status?"selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>
+      <div class="body">
+        <div class="sect"><b>Why this is warm</b>${esc(l.why_warm)}</div>
+        <div class="sect unsure"><b>What we're not sure of</b>${esc(l.uncertainty_notes||"Nothing flagged")}</div>
+        <div class="sect"><b>Evidence</b><ul>${ev||"<li>none</li>"}</ul></div>
+        <div class="sect"><b>Suggested angle</b>${esc(l.suggested_angle)}</div>
+        <div class="sect"><b>Contact</b>${esc(l.contact_name||"Not found")} ${l.contact_role?`(${esc(l.contact_role)})`:""} ${l.contact_email?`— ${esc(l.contact_email)}`:"— no direct email found"} ${l.website?`· <a href="${esc(l.website)}" target="_blank" rel="noopener">website</a>`:""}</div>
+        <div class="sect"><b>Pitch framework — write the email in your own words</b>
+          <div class="pitch"><b>Subject:</b> ${esc(l.pitch_subject)}\n\n${esc(l.pitch_body)}</div></div>
+        <div class="row">
+          <button onclick="copyEmail('${l.id}')">Copy framework</button>
+          <button class="ghost" onclick="setStatus('${l.id}','contacted')">Mark contacted</button>
+        </div>
+        <textarea placeholder="Notes…" onblur="saveNotes('${l.id}',this.value)">${esc(l.notes)}</textarea>
+      </div>
+    </div>`);
+    window["_lead_"+l.id] = l;
+  }
+}
+async function setStatus(id, status){ await api("/api/leads/"+id,{method:"PATCH",body:JSON.stringify({status})}); load(); }
+async function saveNotes(id, notes){ await api("/api/leads/"+id,{method:"PATCH",body:JSON.stringify({notes})}); }
+function copyEmail(id){ const l=window["_lead_"+id]; navigator.clipboard.writeText(`Subject: ${l.pitch_subject}\n\n${l.pitch_body}`); }
+load();
+</script>
+</body>
+</html>

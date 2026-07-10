@@ -1,0 +1,2 @@
+-- Not needed in the local edition: lib/db.js creates the SQLite schema automatically
+-- on first run, in data/leadscout.db. This file kept for reference only.

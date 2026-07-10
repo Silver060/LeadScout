@@ -1,0 +1,94 @@
+{
+  "clientName": "Rebecca Boyle \u2014 strategy-led branding partner (name TBC)",
+  "icp": "Logistics, haulage, or supply-chain company; 20-250 employees; UK or Ireland; founder-led or operations-led; growing (depots, contracts, fleet) faster than its brand, website, or recruitment communication has evolved. The commercial moment: growth held back because the brand no longer explains the business clearly to candidates, employees, or customers.",
+  "services": [
+    "Brand strategy and repositioning (flagship: diagnosis -> strategy -> managed delivery)",
+    "Employer branding and recruitment messaging (Recruitment Messaging Framework)",
+    "Tone of voice and messaging clarity (Tone of Voice Blueprint)",
+    "Website and brand implementation via curated associate network",
+    "Ongoing brand growth retainers"
+  ],
+  "hardFilters": {
+    "maxEmployees": 250,
+    "minEmployees": 20,
+    "regions": [
+      "United Kingdom",
+      "Ireland",
+      "Northern Ireland"
+    ],
+    "autoRejectNameContains": [
+      "plc",
+      "group holdings"
+    ],
+    "maxSignalAgeDays": 60,
+    "nonFit": [
+      "Wants only a cheap logo or website supplier",
+      "Wants content output but will not engage with strategy",
+      "No access to leadership or decision makers",
+      "Wants employer branding to disguise poor employment practices",
+      "Mainly needs large-scale PR, paid media, or recruitment agency services"
+    ]
+  },
+  "maxLeadsPerRun": 3,
+  "resurfaceAfterDays": 180,
+  "coreQueries": [
+    "UK haulage company struggling recruit drivers news",
+    "logistics company UK new depot hiring expansion",
+    "UK freight company contract win growth announcement",
+    "transport company Ireland rebrand OR \"new website\" OR anniversary"
+  ],
+  "rotatingQueries": [
+    "UK logistics company driver shortage recruitment campaign",
+    "haulage firm UK hiring warehouse operatives planners mechanics",
+    "site:exportandfreight.com company growth news",
+    "site:logistics.org.uk member news expansion",
+    "logistics SME award winner 2026 UK Ireland",
+    "family haulage business next generation succession UK",
+    "transport company UK acquisition merger SME",
+    "Northern Ireland logistics company expansion contract",
+    "UK 3PL warehousing company growth hiring",
+    "logistics company careers open day recruitment event UK"
+  ],
+  "rotatingQueriesPerRun": 3,
+  "warmSignals": [
+    "Persistently re-advertised roles (drivers, planners, warehouse, mechanics, managers) - recruitment messaging failing",
+    "Hiring at scale after contract wins or depot openings - growth outpacing employer brand",
+    "Fleet expansion or new depot (O-licence data) with an outdated website or no careers page",
+    "Visibly dated website, inconsistent branding, or no clear employer proposition",
+    "New contract wins where the company must now present itself to bigger customers",
+    "Merger, acquisition, or generational handover requiring repositioning",
+    "Poor or thin presence: no case studies, no people/culture content, jargon-heavy copy",
+    "Award nominations or event appearances (ambition signal) with weak brand to match"
+  ],
+  "companiesHouse": {
+    "sicCodes": [
+      "49410",
+      "52290",
+      "52241"
+    ],
+    "companiesPerRun": 20
+  },
+  "olicence": {
+    "minVehicleIncrease": 3
+  },
+  "fallbackTiers": [
+    {
+      "name": "Regulated sectors with workforce pressure",
+      "note": "Adjacent regulated sector - same pattern: workforce shortage, trust-dependent, weak communication.",
+      "icp": "Owner-led UK/Ireland SME (20-250 staff) in construction, waste management, utilities contracting, food manufacturing, engineering services, or care-sector operations. Struggling to recruit and retain, growing faster than its brand or website, weak employer communication.",
+      "sicCodes": [
+        "41201",
+        "38110",
+        "42990",
+        "10110",
+        "33120"
+      ],
+      "queries": [
+        "UK construction firm struggling recruit skilled trades news",
+        "food manufacturer UK hiring expansion contract",
+        "waste management company UK growth recruitment",
+        "engineering services SME UK skills shortage hiring"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "lead-scout-local",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/index.js",
+    "agent": "node agent/run.js",
+    "agent:dry": "node agent/run.js --dry-run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "express": "^4.19.0",
+    "nodemailer": "^6.9.0"
+  }
+}
