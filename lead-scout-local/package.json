@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server/index.js",
     "agent": "node agent/run.js",
-    "agent:dry": "node agent/run.js --dry-run"
+    "agent:dry": "node agent/run.js --dry-run",
+    "check-sources": "node scripts/check-sources.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

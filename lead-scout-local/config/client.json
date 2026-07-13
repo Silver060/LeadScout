@@ -42,7 +42,7 @@
     "haulage firm UK hiring warehouse operatives planners mechanics",
     "site:exportandfreight.com company growth news",
     "site:logistics.org.uk member news expansion",
-    "logistics SME award winner 2026 UK Ireland",
+    "logistics SME award winner {{year}} UK Ireland",
     "family haulage business next generation succession UK",
     "transport company UK acquisition merger SME",
     "Northern Ireland logistics company expansion contract",
@@ -71,9 +71,45 @@
   "olicence": {
     "minVehicleIncrease": 3
   },
-  "fallbackTiers": [
+  "brandCheck": {
+    "minGapScore": 3
+  },
+  "report": {
+    "greeting": "Morning Becca,",
+    "subjectPrefix": "Lead Scout"
+  },
+  "weeklyOutput": {
+    "targetOpportunities": 3,
+    "maxResults": 5,
+    "allowWatchlist": true
+  },
+  "searchTiers": [
+    {
+      "name": "Core logistics",
+      "resultClassification": "qualified",
+      "includeOlicence": true,
+      "icp": "Logistics, haulage, or supply-chain company; 20-250 employees; UK or Ireland; founder-led or operations-led; growing faster than its brand, website, or recruitment communication has evolved.",
+      "sicCodes": ["49410", "52290", "52241"],
+      "queries": [
+        "UK haulage company struggling recruit drivers news",
+        "logistics company UK new depot hiring expansion",
+        "UK freight company contract win growth announcement",
+        "transport company Ireland rebrand OR \"new website\" OR anniversary"
+      ],
+      "rotatingQueries": [
+        "UK logistics company driver shortage recruitment campaign",
+        "haulage firm UK hiring warehouse operatives planners mechanics",
+        "logistics SME award winner {{year}} UK Ireland",
+        "family haulage business next generation succession UK",
+        "transport company UK acquisition merger SME"
+      ],
+      "requiredChecks": ["dated_signal", "icp_match", "service_link"],
+      "maxResults": 3
+    },
     {
       "name": "Regulated sectors with workforce pressure",
+      "resultClassification": "adjacent",
+      "includeOlicence": false,
       "note": "Adjacent regulated sector - same pattern: workforce shortage, trust-dependent, weak communication.",
       "icp": "Owner-led UK/Ireland SME (20-250 staff) in construction, waste management, utilities contracting, food manufacturing, engineering services, or care-sector operations. Struggling to recruit and retain, growing faster than its brand or website, weak employer communication.",
       "sicCodes": [
@@ -88,7 +124,62 @@
         "food manufacturer UK hiring expansion contract",
         "waste management company UK growth recruitment",
         "engineering services SME UK skills shortage hiring"
-      ]
+      ],
+      "rotatingQueries": [
+        "UK facilities management company contract win hiring",
+        "UK utilities contractor new contract expansion",
+        "UK care provider recruitment campaign expansion"
+      ],
+      "requiredChecks": ["dated_signal", "icp_match", "service_link"],
+      "maxResults": 3
+    },
+    {
+      "name": "Broad founder-led SMEs",
+      "resultClassification": "exploratory",
+      "includeOlicence": false,
+      "note": "Outside the preferred sectors; commercial trigger and service relevance verified, sector fit remains exploratory.",
+      "icp": "Founder-led or operational UK/Ireland SME with 10-500 employees showing a strong commercial change and a visible brand, positioning, reputation, recruitment, or communication gap.",
+      "sicCodes": [],
+      "minEmployees": 10,
+      "maxEmployees": 500,
+      "maxSignalAgeDays": 90,
+      "queries": [
+        "UK family business acquisition merger new premises expansion SME",
+        "UK founder led company major contract win hiring expansion",
+        "Ireland SME leadership succession rebrand expansion",
+        "UK business anniversary new market launch rebrand award"
+      ],
+      "rotatingQueries": [
+        "UK SME generational handover new leadership",
+        "UK regional business new premises recruitment drive",
+        "Ireland founder led business contract win expansion"
+      ],
+      "requiredChecks": ["dated_signal", "service_link"],
+      "maxResults": 3
+    },
+    {
+      "name": "Evidence-incomplete watchlist",
+      "resultClassification": "watchlist",
+      "includeOlicence": false,
+      "note": "Manual review required: activity or fit is plausible but evidence is incomplete.",
+      "icp": "Active UK/Ireland SME with a visible careers-page, recruitment-message, brand, positioning, or communication weakness and some evidence of current business activity.",
+      "sicCodes": [],
+      "minEmployees": 10,
+      "maxEmployees": 500,
+      "maxSignalAgeDays": 120,
+      "queries": [
+        "UK SME hiring multiple roles outdated careers page",
+        "UK regional company expansion weak website recruitment",
+        "Ireland SME growing hiring new premises",
+        "site:insidermedia.com company new premises jobs {{month}} {{year}}",
+        "site:business-live.co.uk SME expansion hiring {{month}} {{year}}",
+        "site:businesspost.ie company funding expansion hiring {{month}} {{year}}"
+      ],
+      "rotatingQueries": [],
+      "requiredChecks": [],
+      "requiredAnyChecks": ["dated_signal", "service_link"],
+      "minBrandGapScore": 1,
+      "maxResults": 3
     }
   ]
 }

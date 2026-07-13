@@ -1,46 +1,87 @@
 import { env } from "../lib/env.js";
 import { sendMail } from "../lib/mailer.js";
 
-const esc = (s) => String(s || "").replace(/</g, "&lt;");
+const esc = (value) => String(value || "").replace(/[&<>\"]/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;",
+}[character]));
 
-function leadHtml(l) {
-  const ev = (l.evidence || [])
-    .map((e) => `<li><a href="${esc(e.url)}">${esc(e.title)}</a>${e.date ? ` (${esc(e.date)})` : ""}</li>`)
-    .join("");
+function safeUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? esc(url.toString()) : "#";
+  } catch {
+    return "#";
+  }
+}
+
+function leadHtml(lead) {
+  const classification = lead.opportunity_classification || "qualified";
+  const colours = {
+    qualified: "#d4edda",
+    adjacent: "#dbeafe",
+    exploratory: "#fef3c7",
+    watchlist: "#f3f4f6",
+  };
+  const evidence = (lead.evidence || []).map((item) =>
+    `<li><a href="${safeUrl(item.url)}">${esc(item.title)}</a>${item.date ? ` (${esc(item.date)})` : ""}</li>`
+  ).join("");
+  const pitch = lead.pitch_body ? `
+    <div style="background:#f7f7f7;border-radius:6px;padding:12px;margin-top:8px">
+      <b>Pitch framework - starting points for your email:</b>
+      <p><b>Subject:</b> ${esc(lead.pitch_subject)}</p>
+      <p style="white-space:pre-wrap">${esc(lead.pitch_body)}</p>
+    </div>` : "";
+
   return `
   <div style="border:1px solid #ddd;border-radius:8px;padding:16px;margin:16px 0;font-family:sans-serif">
-    <h2 style="margin:0">${esc(l.company_name)}
-      <span style="font-size:13px;padding:2px 8px;border-radius:10px;background:${l.confidence === "high" ? "#d4edda" : "#fff3cd"}">${l.confidence.toUpperCase()}</span>
+    <h2 style="margin:0">${esc(lead.company_name)}
+      <span style="font-size:13px;padding:2px 8px;border-radius:10px;background:${colours[classification] || colours.watchlist}">${esc(classification.toUpperCase())}</span>
     </h2>
-    <p><b>Signal:</b> ${esc(l.signal_summary)} ${l.signal_date ? `— ${esc(l.signal_date)}` : ""}</p>
-    <p><b>Why this is warm:</b> ${esc(l.why_warm)}</p>
-    <p><b>What we're not sure of:</b> ${esc(l.uncertainty_notes || "nothing flagged")}</p>
-    <p><b>Evidence:</b></p><ul>${ev}</ul>
-    <p><b>Suggested angle:</b> ${esc(l.suggested_angle)}</p>
-    <p><b>Contact:</b> ${esc(l.contact_name || "not found")} ${l.contact_role ? `(${esc(l.contact_role)})` : ""} ${l.contact_email ? `— ${esc(l.contact_email)}` : "— no direct email found"}<br>
-       <small>Source: ${esc(l.contact_source)}</small> ${l.website ? `· <a href="${esc(l.website)}">${esc(l.website)}</a>` : ""}</p>
-    <div style="background:#f7f7f7;border-radius:6px;padding:12px;margin-top:8px">
-      <b>Pitch framework — starting points for YOUR email (not copy to paste):</b>
-      <p><b>Subject:</b> ${esc(l.pitch_subject)}</p>
-      <p style="white-space:pre-wrap">${esc(l.pitch_body)}</p>
-    </div>
+    <p><b>Source tier:</b> ${esc(lead.source_tier || "Core")}</p>
+    <p><b>Trigger or activity:</b> ${esc(lead.signal_summary)} ${lead.signal_date ? `- ${esc(lead.signal_date)}` : ""}</p>
+    <p><b>Why it may be relevant:</b> ${esc(lead.why_warm)}</p>
+    <p><b>Uncertainty:</b> ${esc(lead.uncertainty_notes || "nothing flagged")}</p>
+    <p><b>Suggested next check:</b> ${esc(lead.suggested_next_check || "Review the evidence")}</p>
+    <p><b>Evidence:</b></p><ul>${evidence}</ul>
+    <p><b>Suggested angle:</b> ${esc(lead.suggested_angle)}</p>
+    <p><b>Contact:</b> ${esc(lead.contact_name || "not found")} ${lead.contact_role ? `(${esc(lead.contact_role)})` : ""} ${lead.contact_email ? `- ${esc(lead.contact_email)}` : "- no direct email found"}<br>
+       <small>Source: ${esc(lead.contact_source)}</small> ${lead.website ? `&middot; <a href="${safeUrl(lead.website)}">${esc(lead.website)}</a>` : ""}</p>
+    ${pitch}
   </div>`;
 }
 
-export async function sendMondayReport({ leads, run, queries, trackerUrl }) {
-  const date = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-  let subject, body;
+export function buildMondayReport({ leads, run, queries, trackerUrl, config = {}, date = new Date() }) {
+  const dateLabel = date.toLocaleDateString("en-GB", {
+    weekday: "short", day: "numeric", month: "short",
+  });
+  const greeting = esc(config.report?.greeting || "Morning Becca,");
+  const prefix = config.report?.subjectPrefix || "Lead Scout";
   if (leads.length === 0) {
-    subject = `Lead Scout — no leads met the bar this week (${date})`;
-    body = `<p style="font-family:sans-serif">Nothing qualified this week — we'd rather send you nothing than filler.</p>
-      <p style="font-family:sans-serif"><b>What we searched:</b></p>
-      <ul style="font-family:sans-serif">${queries.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>
-      <p style="font-family:sans-serif">Considered ${run.candidates_found} companies; none had a strong, recent, dateable trigger.</p>`;
-  } else {
-    subject = `Lead Scout — ${leads.length} lead${leads.length > 1 ? "s" : ""} this week (${date})`;
-    body = leads.map(leadHtml).join("") +
-      `<p style="font-family:sans-serif;color:#666">Considered ${run.candidates_found}, rejected ${run.candidates_found - leads.length}. ` +
-      (trackerUrl ? `<a href="${trackerUrl}">Track status</a>` : "") + `</p>`;
+    return {
+      subject: `${prefix} - no usable opportunities this week (${dateLabel})`,
+      body: `<p style="font-family:sans-serif">${greeting}</p>
+        <p style="font-family:sans-serif">Every configured search tier was exhausted, but no evidence-backed opportunity was suitable to show.</p>
+        <p style="font-family:sans-serif"><b>What we searched:</b></p>
+        <ul style="font-family:sans-serif">${queries.map((query) => `<li>${esc(query)}</li>`).join("")}</ul>
+        <p style="font-family:sans-serif">Considered ${run.candidates_found} companies.</p>`,
+    };
   }
+
+  const counts = Object.fromEntries(["qualified", "adjacent", "exploratory", "watchlist"]
+    .map((classification) => [classification, leads.filter((lead) =>
+      (lead.opportunity_classification || "qualified") === classification).length]));
+  return {
+    subject: `${prefix} - ${leads.length} opportunit${leads.length === 1 ? "y" : "ies"} this week (${dateLabel})`,
+    body: `<p style="font-family:sans-serif">${greeting}</p>
+      <h1 style="font-family:sans-serif">Strongest opportunities this week</h1>
+      <p style="font-family:sans-serif"><b>Qualified:</b> ${counts.qualified} &middot; <b>Adjacent:</b> ${counts.adjacent} &middot; <b>Exploratory:</b> ${counts.exploratory} &middot; <b>Watchlist:</b> ${counts.watchlist}</p>` +
+      leads.map(leadHtml).join("") +
+      `<p style="font-family:sans-serif;color:#666">Considered ${run.candidates_found}. ` +
+      (trackerUrl ? `<a href="${safeUrl(trackerUrl)}">Track status</a>` : "") + "</p>",
+  };
+}
+
+export async function sendMondayReport(input) {
+  const { subject, body } = buildMondayReport(input);
   return sendMail({ to: env.reportTo(), subject, html: body });
 }
