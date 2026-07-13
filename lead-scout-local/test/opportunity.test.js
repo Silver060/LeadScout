@@ -51,20 +51,35 @@ test("exploratory classification permits uncertain sector fit but not a missing 
   assert.equal(classifyOpportunity(candidate, false, "exploratory"), "watchlist");
 });
 
-test("watchlist tier can retain an evidenced service link with incomplete checks", () => {
+test("watchlist tier can retain dated activity or a service link with incomplete checks", () => {
   const tier = configuredTiers(config).at(-1);
   const scope = buildTierScope(config, tier);
   const modelOutput = {
     candidates: [{
       company_name: "Example Engineering",
-      signal_date: null,
-      evidence: [{ url: "https://example.test/about", date: null }],
-      checks: { dated_signal: false, icp_match: false, service_link: true },
+      signal_date: "2026-07-13",
+      evidence: [{ url: "https://example.test/news", date: "2026-07-13" }],
+      checks: { dated_signal: true, icp_match: false, service_link: false },
     }],
     rejected: [],
   };
   const result = enforceCandidateRules(scope, [], [], modelOutput);
   assert.equal(result.candidates.length, 1);
+  assert.equal(scope.brandCheck.minGapScore, 1);
+});
+
+test("watchlist still rejects an item with neither dated activity nor service relevance", () => {
+  const scope = buildTierScope(config, configuredTiers(config).at(-1));
+  const result = enforceCandidateRules(scope, [], [], {
+    candidates: [{
+      company_name: "Evidence Free Ltd",
+      signal_date: null,
+      evidence: [],
+      checks: { dated_signal: false, icp_match: true, service_link: false },
+    }],
+    rejected: [],
+  });
+  assert.equal(result.candidates.length, 0);
 });
 
 test("only qualified and adjacent opportunities receive full pitch frameworks", () => {

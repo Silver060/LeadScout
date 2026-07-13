@@ -185,3 +185,7 @@ cap. Queries are deduplicated before search and reporting.
 The Monday email reports counts for all four classes and only produces a truly
 empty report after every configured tier has run. This guarantees useful research
 when evidence exists, not an artificial quota of supposedly qualified leads.
+
+For a corrective one-off run, `node agent/run.js --reconsider-rejected` ignores
+recent rejection history while still deduplicating previously accepted leads.
+This is useful after qualification rules change; scheduled runs should omit it.

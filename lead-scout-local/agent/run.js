@@ -28,6 +28,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
   return [key, value ?? true];
 }));
 const dryRun = !!args["dry-run"];
+const reconsiderRejected = !!args["reconsider-rejected"];
 const maxQueries = args["max-queries"] ? Number(args["max-queries"]) : null;
 const trigger = args.trigger || "manual";
 
@@ -41,7 +42,9 @@ async function main() {
   log("run", `started ${dryRun ? "(DRY RUN)" : run.id} trigger=${trigger}`);
 
   try {
-    const known = dryRun ? new Set() : await knownCompanies(config.resurfaceAfterDays);
+    const known = dryRun
+      ? new Set()
+      : await knownCompanies(config.resurfaceAfterDays, { includeRejected: !reconsiderRejected });
     const rejected = [];
     const allQueries = [];
     let candidatesConsidered = 0;
@@ -103,7 +106,7 @@ async function main() {
         const brand = await brandCheck({ ...candidate, website: info.website }, log);
         if (brand) {
           const score = Number(brand.brand_gap_score);
-          const minScore = config.brandCheck?.minGapScore ?? 3;
+          const minScore = scope.brandCheck?.minGapScore ?? 3;
           if (Number.isFinite(score) && score < minScore) {
             const reason = `brand gap score ${score}/5 is below the ${minScore}/5 threshold`;
             log("qualify", `rejected post-brand-check: ${candidate.company_name} (${reason})`);
@@ -115,6 +118,12 @@ async function main() {
             `Brand gap ${score}/5: ${brand.specific_gaps?.[0] || "visible communication gap"}`,
           ].filter(Boolean).join(" ");
           candidate.brand = brand;
+          if (score < (config.brandCheck?.minGapScore ?? 3)) {
+            candidate.uncertainty_notes = [
+              candidate.uncertainty_notes,
+              `Brand gap scored ${score}/5, below the normal qualified-lead threshold; retained for manual watchlist review.`,
+            ].filter(Boolean).join("; ");
+          }
         } else {
           candidate.uncertainty_notes = [candidate.uncertainty_notes, "brand gap could not be verified"]
             .filter(Boolean).join("; ");

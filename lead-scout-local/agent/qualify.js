@@ -61,7 +61,11 @@ export function enforceCandidateRules(
     const requiredChecks = config.qualification?.requiredChecks || [
       "dated_signal", "icp_match", "service_link",
     ];
+    const requiredAnyChecks = config.qualification?.requiredAnyChecks || [];
     const failed = requiredChecks.filter((name) => candidate.checks[name] !== true);
+    if (requiredAnyChecks.length && !requiredAnyChecks.some((name) => candidate.checks[name] === true)) {
+      failed.push(`one of: ${requiredAnyChecks.join(" or ")}`);
+    }
     if (blockedName || failed.length) {
       rejected.push({
         company_name: candidate.company_name,
@@ -82,6 +86,7 @@ export async function qualify(config, searchResults, structuredSignals, log) {
   const requiredChecks = config.qualification?.requiredChecks || [
     "dated_signal", "icp_match", "service_link",
   ];
+  const requiredAnyChecks = config.qualification?.requiredAnyChecks || [];
   const system = `You qualify B2B leads for ${config.clientName}.
 Ideal client: ${config.icp}
 Services offered: ${config.services.join("; ")}
@@ -97,6 +102,7 @@ HARD RULES:
 - Auto-reject companies clearly over ${config.hardFilters.maxEmployees} employees, plcs, national brands, or names containing: ${config.hardFilters.autoRejectNameContains.join(", ")}.
 - Only companies based in: ${config.hardFilters.regions.join(", ")}.
 - Required checks for this tier: ${requiredChecks.join(", ")}.
+- ${requiredAnyChecks.length ? `At least one of these checks must pass: ${requiredAnyChecks.join(", ")}.` : "There is no alternative-check group for this tier."}
 - Other checks may be false only when this tier explicitly permits uncertainty. Report that uncertainty; do not turn it into a fact.
 - Merge multiple signals for the same company into one candidate.
 - Quality over quantity. Select at most ${config.maxLeadsPerRun}. Zero is acceptable.

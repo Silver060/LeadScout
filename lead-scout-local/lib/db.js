@@ -91,14 +91,16 @@ export async function finishRun(runId, patch) {
     .run(...keys.map((k) => cols[k]), runId);
 }
 
-export async function knownCompanies(resurfaceAfterDays) {
+export async function knownCompanies(resurfaceAfterDays, { includeRejected = true } = {}) {
   const set = new Set();
   for (const r of sqlite.prepare(`select company_name_normalized from leads`).all())
     set.add(r.company_name_normalized);
-  for (const r of sqlite.prepare(
-    `select company_name_normalized from rejected_leads where created_at > datetime('now', ?)`
-  ).all(`-${resurfaceAfterDays} days`))
-    set.add(r.company_name_normalized);
+  if (includeRejected) {
+    for (const r of sqlite.prepare(
+      `select company_name_normalized from rejected_leads where created_at > datetime('now', ?)`
+    ).all(`-${resurfaceAfterDays} days`))
+      set.add(r.company_name_normalized);
+  }
   return set;
 }
 

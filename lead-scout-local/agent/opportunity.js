@@ -49,6 +49,11 @@ export function buildTierScope(config, tier) {
     },
     qualification: {
       requiredChecks: tier.requiredChecks || ["dated_signal", "icp_match", "service_link"],
+      requiredAnyChecks: tier.requiredAnyChecks || [],
+    },
+    brandCheck: {
+      ...config.brandCheck,
+      minGapScore: tier.minBrandGapScore ?? config.brandCheck?.minGapScore,
     },
   };
 }

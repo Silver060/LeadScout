@@ -170,10 +170,15 @@
       "queries": [
         "UK SME hiring multiple roles outdated careers page",
         "UK regional company expansion weak website recruitment",
-        "Ireland SME growing hiring new premises"
+        "Ireland SME growing hiring new premises",
+        "site:insidermedia.com company new premises jobs {{month}} {{year}}",
+        "site:business-live.co.uk SME expansion hiring {{month}} {{year}}",
+        "site:businesspost.ie company funding expansion hiring {{month}} {{year}}"
       ],
       "rotatingQueries": [],
-      "requiredChecks": ["service_link"],
+      "requiredChecks": [],
+      "requiredAnyChecks": ["dated_signal", "service_link"],
+      "minBrandGapScore": 1,
       "maxResults": 3
     }
   ]
