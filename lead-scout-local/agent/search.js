@@ -6,12 +6,26 @@ function weekNumber(d = new Date()) {
   return Math.ceil(((d - jan1) / 86400e3 + jan1.getUTCDay() + 1) / 7);
 }
 
+export function applyQueryTokens(query, date = new Date()) {
+  const month = new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    timeZone: "Europe/London",
+  }).format(date);
+  return query
+    .replaceAll("{{year}}", String(date.getFullYear()))
+    .replaceAll("{{month}}", month);
+}
+
 export function pickQueries(config, maxQueries) {
-  const rot = config.rotatingQueries;
+  const rot = Array.isArray(config.rotatingQueries) ? config.rotatingQueries : [];
   const n = config.rotatingQueriesPerRun || 3;
-  const start = weekNumber() % rot.length;
-  const rotating = Array.from({ length: n }, (_, i) => rot[(start + i) % rot.length]);
-  const all = [...config.coreQueries, ...rotating];
+  const start = rot.length ? weekNumber() % rot.length : 0;
+  const rotating = rot.length
+    ? Array.from({ length: Math.min(n, rot.length) }, (_, i) => rot[(start + i) % rot.length])
+    : [];
+  const all = [...(config.coreQueries || []), ...rotating]
+    .map((q) => applyQueryTokens(q))
+    .filter((q, index, queries) => q && queries.indexOf(q) === index);
   return maxQueries ? all.slice(0, maxQueries) : all;
 }
 

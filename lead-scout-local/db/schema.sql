@@ -1,2 +1,5 @@
 -- Not needed in the local edition: lib/db.js creates the SQLite schema automatically
 -- on first run, in data/leadscout.db. This file kept for reference only.
+-- Opportunity fields added by the runtime schema migration:
+-- opportunity_classification, source_tier, qualification_checks,
+-- manual_review_required, suggested_next_check.

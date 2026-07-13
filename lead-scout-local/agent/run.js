@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Lead Scout Becca Edition — single-run entry point.
+// Lead Scout Becca Edition - single-run entry point.
 // Usage: node agent/run.js [--dry-run] [--max-queries=N] [--trigger=cron]
 import { readFileSync } from "fs";
 import { checkEnv } from "../lib/env.js";
@@ -14,10 +14,18 @@ import { enrich } from "./enrich.js";
 import { writePitch } from "./pitch.js";
 import { brandCheck } from "./brandcheck.js";
 import { sendMondayReport } from "./report.js";
+import {
+  buildTierScope,
+  classifyOpportunity,
+  configuredTiers,
+  needsMoreOpportunities,
+  rankOpportunities,
+  shouldCreatePitch,
+} from "./opportunity.js";
 
-const args = Object.fromEntries(process.argv.slice(2).map((a) => {
-  const [k, v] = a.replace(/^--/, "").split("=");
-  return [k, v ?? true];
+const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
+  const [key, value] = arg.replace(/^--/, "").split("=");
+  return [key, value ?? true];
 }));
 const dryRun = !!args["dry-run"];
 const maxQueries = args["max-queries"] ? Number(args["max-queries"]) : null;
@@ -33,107 +41,161 @@ async function main() {
   log("run", `started ${dryRun ? "(DRY RUN)" : run.id} trigger=${trigger}`);
 
   try {
-    // One discovery pass = sources -> search -> qualify -> dedupe, for a given scope.
     const known = dryRun ? new Set() : await knownCompanies(config.resurfaceAfterDays);
     const rejected = [];
-    let allQueries = [];
+    const allQueries = [];
     let candidatesConsidered = 0;
 
-    async function discoveryPass(scope, tierNote) {
+    async function discoveryPass(scope, tier) {
       const structured = [
         ...(await companiesHouse.findCandidates(scope, log)),
-        ...(await olicence.findCandidates(scope, log, { persist: !dryRun })),
+        ...(tier.includeOlicence
+          ? await olicence.findCandidates(scope, log, { persist: !dryRun })
+          : []),
       ];
       const { queries, results } = await runSearches(scope, log, maxQueries);
       allQueries.push(...queries);
-      const { candidates, rejected: rej } = await qualify(scope, results, structured, log);
-      candidatesConsidered += candidates.length + rej.length;
-      rejected.push(...rej);
+      const { candidates, rejected: passRejected } = await qualify(scope, results, structured, log);
+      candidatesConsidered += candidates.length + passRejected.length;
+      rejected.push(...passRejected);
       const fresh = [];
-      for (const c of candidates) {
-        const norm = normalizeName(c.company_name);
+      for (const candidate of candidates) {
+        const norm = normalizeName(candidate.company_name);
         if (known.has(norm)) {
-          log("dedupe", `duplicate: ${c.company_name}`);
-          rejected.push({ company_name: c.company_name, reason: "duplicate (already known)" });
-        } else {
-          known.add(norm);
-          if (tierNote) c.uncertainty_notes = [tierNote, c.uncertainty_notes].filter(Boolean).join(" ");
-          fresh.push({ ...c, norm });
+          log("dedupe", `duplicate: ${candidate.company_name}`);
+          rejected.push({ company_name: candidate.company_name, reason: "duplicate (already known)" });
+          continue;
         }
+        known.add(norm);
+        if (tier.note) {
+          candidate.uncertainty_notes = [tier.note, candidate.uncertainty_notes]
+            .filter(Boolean).join(" ");
+        }
+        fresh.push({ ...candidate, norm });
       }
       return fresh;
     }
 
-    // Ring 1: core ICP
-    let fresh = await discoveryPass(config, null);
+    const leads = [];
+    const output = config.weeklyOutput || {};
+    const target = output.targetOpportunities || config.maxLeadsPerRun || 3;
+    const maxResults = output.maxResults || config.maxLeadsPerRun || 5;
 
-    // Widening fallback: if the core ICP produced nothing, try pre-approved adjacent tiers.
-    // Same quality bar and hard filters — only the sector scope changes.
-    if (fresh.length === 0 && Array.isArray(config.fallbackTiers)) {
-      for (const tier of config.fallbackTiers) {
-        log("widen", `no core leads — widening to tier: ${tier.name}`);
-        const scope = {
-          ...config,
-          icp: tier.icp,
-          coreQueries: tier.queries || config.coreQueries,
-          rotatingQueries: config.rotatingQueries,
-          companiesHouse: { ...config.companiesHouse, sicCodes: tier.sicCodes || config.companiesHouse?.sicCodes },
-        };
-        fresh = await discoveryPass(scope, `[Adjacent sector: ${tier.name}] ${tier.note || ""}`.trim());
-        if (fresh.length > 0) break;
+    for (const tier of configuredTiers(config)) {
+      if (!needsMoreOpportunities(leads.length, target)) break;
+      log("widen", `running tier: ${tier.name} (${tier.resultClassification})`);
+      const scope = buildTierScope(config, tier);
+      const fresh = await discoveryPass(scope, tier);
+      let tierAccepted = 0;
+
+      for (const candidate of fresh) {
+        if (leads.length >= maxResults || tierAccepted >= (tier.maxResults || maxResults)) break;
+        const info = await enrich(candidate, log, scope.hardFilters.maxEmployees);
+        if (info.over_max_employees || info.is_national_brand) {
+          const reason = info.over_max_employees
+            ? `company exceeds ${scope.hardFilters.maxEmployees} employees`
+            : "company appears to be a national brand";
+          log("qualify", `rejected post-enrichment: ${candidate.company_name} (${reason})`);
+          rejected.push({ company_name: candidate.company_name, reason });
+          continue;
+        }
+
+        const brand = await brandCheck({ ...candidate, website: info.website }, log);
+        if (brand) {
+          const score = Number(brand.brand_gap_score);
+          const minScore = config.brandCheck?.minGapScore ?? 3;
+          if (Number.isFinite(score) && score < minScore) {
+            const reason = `brand gap score ${score}/5 is below the ${minScore}/5 threshold`;
+            log("qualify", `rejected post-brand-check: ${candidate.company_name} (${reason})`);
+            rejected.push({ company_name: candidate.company_name, reason });
+            continue;
+          }
+          candidate.why_warm = [
+            candidate.why_warm,
+            `Brand gap ${score}/5: ${brand.specific_gaps?.[0] || "visible communication gap"}`,
+          ].filter(Boolean).join(" ");
+          candidate.brand = brand;
+        } else {
+          candidate.uncertainty_notes = [candidate.uncertainty_notes, "brand gap could not be verified"]
+            .filter(Boolean).join("; ");
+        }
+
+        const contactFound = !!(info.contact_email || info.contact_name);
+        const { confidence } = finalConfidence(candidate, contactFound);
+        const classification = classifyOpportunity(
+          candidate,
+          contactFound,
+          tier.resultClassification,
+        );
+        if (classification === "watchlist" && output.allowWatchlist === false) {
+          rejected.push({ company_name: candidate.company_name, reason: "watchlist result disabled" });
+          continue;
+        }
+
+        const missing = [
+          ...Object.entries(candidate.checks || {}).filter(([, ok]) => !ok).map(([name]) => name),
+          ...(!contactFound ? ["decision-maker contact"] : []),
+          ...(!brand ? ["verified brand gap"] : []),
+        ];
+        const pitch = shouldCreatePitch(classification)
+          ? await writePitch(config, { ...candidate, ...info, brand: candidate.brand }, log)
+          : { subject: null, body: null };
+        leads.push({
+          run_id: dryRun ? null : run.id,
+          company_name: candidate.company_name,
+          company_name_normalized: candidate.norm,
+          website: info.website,
+          signal_summary: candidate.signal_summary,
+          signal_date: candidate.signal_date,
+          why_warm: candidate.why_warm,
+          confidence: confidence === "reject" ? "low" : confidence,
+          opportunity_classification: classification,
+          source_tier: tier.name,
+          qualification_checks: candidate.checks,
+          manual_review_required: classification === "watchlist" || classification === "exploratory",
+          suggested_next_check: missing.length
+            ? `Verify ${missing.join(", ")}.`
+            : "Review the evidence and approve the outreach angle.",
+          uncertainty_notes: [
+            candidate.uncertainty_notes,
+            info.size_note === "unverified" ? "company size unverified" : null,
+          ].filter(Boolean).join("; "),
+          evidence: candidate.evidence,
+          contact_name: info.contact_name,
+          contact_role: info.contact_role,
+          contact_email: info.contact_email,
+          contact_source: info.contact_source,
+          suggested_angle: candidate.suggested_angle,
+          pitch_subject: pitch.subject,
+          pitch_body: pitch.body,
+        });
+        tierAccepted++;
       }
+      log("widen", `${tier.name}: ${tierAccepted} usable result(s); ${leads.length}/${target} weekly target`);
     }
-    const queries = allQueries;
+
+    rankOpportunities(leads);
+    leads.splice(maxResults);
+    const queries = [...new Set(allQueries)];
     run.candidates_found = candidatesConsidered;
 
-    // 4. Enrich + final confidence + pitch
-    const leads = [];
-    for (const c of fresh) {
-      const info = await enrich(c, log);
-      const brand = await brandCheck({ ...c, website: info.website }, log);
-      if (brand) {
-        c.why_warm += ` Brand gap ${brand.brand_gap_score}/5: ${brand.specific_gaps?.[0] || ""}`;
-        c.brand = brand;
-      }
-      const { confidence, passed } = finalConfidence(c, !!(info.contact_email || info.contact_name));
-      if (confidence === "reject") {
-        log("qualify", `rejected post-enrichment: ${c.company_name} (${passed}/4)`);
-        rejected.push({ company_name: c.company_name, reason: `only ${passed}/4 checks after enrichment` });
-        continue;
-      }
-      const pitch = await writePitch(config, { ...c, ...info, brand: c.brand }, log);
-      leads.push({
-        run_id: dryRun ? null : run.id,
-        company_name: c.company_name,
-        company_name_normalized: c.norm,
-        website: info.website,
-        signal_summary: c.signal_summary,
-        signal_date: c.signal_date,
-        why_warm: c.why_warm,
-        confidence,
-        uncertainty_notes: [c.uncertainty_notes, info.size_note === "unverified" ? "company size unverified" : null].filter(Boolean).join("; "),
-        evidence: c.evidence,
-        contact_name: info.contact_name,
-        contact_role: info.contact_role,
-        contact_email: info.contact_email,
-        contact_source: info.contact_source,
-        suggested_angle: c.suggested_angle,
-        pitch_subject: pitch.subject,
-        pitch_body: pitch.body,
-      });
-    }
-
-    // 5. Persist
     if (!dryRun) {
-      for (const l of leads) await saveLead(l);
-      for (const r of rejected) await saveRejection(run.id, normalizeName(r.company_name), r.reason);
+      for (const lead of leads) await saveLead(lead);
+      for (const item of rejected) {
+        await saveRejection(run.id, normalizeName(item.company_name), item.reason);
+      }
     }
 
-    // 6. Report
     let emailSent = false;
     if (!dryRun) {
-      const res = await sendMondayReport({ leads, run, queries, trackerUrl: process.env.TRACKER_URL });
-      emailSent = !res.skipped;
+      const result = await sendMondayReport({
+        leads,
+        run,
+        queries,
+        trackerUrl: process.env.TRACKER_URL,
+        config,
+      });
+      emailSent = !result.skipped;
       log("report", emailSent ? "Monday email sent" : "email skipped (EMAIL_ENABLED=false)");
     }
 
@@ -147,13 +209,17 @@ async function main() {
         log: log.dump(),
       });
     }
-    log("run", `done: ${leads.length} leads accepted, ${rejected.length} rejected`);
+    log("run", `done: ${leads.length} opportunities accepted, ${rejected.length} rejected`);
     if (dryRun) console.log("\n=== DRY RUN OUTPUT ===\n" + JSON.stringify(leads, null, 2));
-  } catch (err) {
-    log.error("run", err.message);
+  } catch (error) {
+    log.error("run", error.message);
     if (!dryRun) {
-      await finishRun(run.id, { status: "failed", error_message: err.message, log: log.dump() }).catch(() => {});
-      await alertAdmin(`Run failed: ${err.message}`, log.dump());
+      await finishRun(run.id, {
+        status: "failed",
+        error_message: error.message,
+        log: log.dump(),
+      }).catch(() => {});
+      await alertAdmin(`Run failed: ${error.message}`, log.dump());
     }
     process.exitCode = 1;
   }

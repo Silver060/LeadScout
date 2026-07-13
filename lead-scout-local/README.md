@@ -19,7 +19,7 @@ Anthropic/Claude, and SMTP are external services when enabled.
 ## Setup (once)
 
 1. Unzip this folder somewhere permanent, e.g. `C:\LeadScout`
-2. Open a terminal in that folder and run: `npm install`
+2. Open PowerShell in that folder and run: `npm.cmd install`
 3. Copy `.env.example` to `.env` and fill in your keys and email settings
 4. Edit `config/client.json` (ICP, queries) and paste 2-3 of Becca's real
    emails into `config/voice-examples.md`
@@ -28,13 +28,16 @@ For Companies House, create a free REST API key at
 https://developer.company-information.service.gov.uk and put it in `.env` as
 `COMPANIES_HOUSE_API_KEY=...`.
 
+The default Claude models can be changed with `MODEL_QUALITY` and
+`MODEL_TRIAGE` in `.env`.
+
 ## Running
 
 ```
 node agent/run.js --dry-run              # full pipeline, nothing saved, no email
 node agent/run.js --dry-run --max-queries=2   # cheap test
 node agent/run.js                        # real run: saves to DB, emails Becca
-npm start                                # tracker at http://localhost:3000
+npm.cmd start                            # tracker at http://localhost:3100
 npm run check-sources -- --no-network    # validate local structured sources only
 npm run check-sources                    # also checks Companies House auth if key is set
 ```
@@ -121,7 +124,7 @@ paste: 3 subject ideas, an opening hook tied to the trigger event, 2-4 talking
 points, one "avoid" warning based on what's uncertain, and a deliberately rough
 60-90 word skeleton. The email stays hers.
 
-## Widening fallback (v1.2)
+## Legacy widening fallback (v1.2, superseded)
 
 If a week produces zero core-ICP leads, the agent does NOT loosen the quality
 bar. Instead it re-runs the full pipeline against pre-approved adjacent sectors
@@ -156,3 +159,29 @@ config/client-lissah-boyle-legacy.json):
 - Pitch frameworks now open with the trigger event AND a specific detail from
   the prospect's own website — per her positioning rule: lead with the
   commercial moment, never a service list.
+
+## Progressive weekly opportunities (v2.1)
+
+LeadScout now completes discovery, qualification, enrichment, brand checking,
+and final classification for each search tier before deciding whether to widen.
+It continues until `weeklyOutput.targetOpportunities` usable results have been
+collected or every configured `searchTiers` entry has been exhausted.
+
+Results are labelled honestly:
+
+- `qualified`: core logistics fit with all final checks, including a contact;
+- `adjacent`: approved workforce-heavy sector with a dated, relevant trigger;
+- `exploratory`: broader founder-led SME with a verified commercial trigger and
+  service link, but uncertain sector fit;
+- `watchlist`: evidence suggests a useful manual review, but one or more checks
+  remain incomplete.
+
+Qualified and adjacent results receive full pitch frameworks. Exploratory and
+watchlist items receive only a suggested angle and next check. Results accumulate
+across tiers; weaker results never replace stronger earlier ones. Each tier owns
+its queries, size range, signal-age limit, SIC codes, required checks, and result
+cap. Queries are deduplicated before search and reporting.
+
+The Monday email reports counts for all four classes and only produces a truly
+empty report after every configured tier has run. This guarantees useful research
+when evidence exists, not an artificial quota of supposedly qualified leads.

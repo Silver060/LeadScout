@@ -99,6 +99,10 @@ export async function findCandidates(config, log, options = {}) {
     baseMs: chCfg.retryBaseMs ?? 1500,
   });
   const sicCodes = (chCfg.sicCodes || ["49410"]).map(String);
+  if (sicCodes.length === 0) {
+    log("ch", "skipped - this search tier has no configured SIC codes");
+    return [];
+  }
   const maxAgeDays = config.hardFilters?.maxSignalAgeDays || 60;
   const sample = chCfg.companiesPerRun || 20;
   const now = options.now || new Date();

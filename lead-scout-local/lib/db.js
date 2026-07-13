@@ -54,6 +54,17 @@ create table if not exists rejected_leads (
 );
 `);
 
+const leadColumns = new Set(sqlite.prepare("pragma table_info(leads)").all().map((column) => column.name));
+for (const [name, definition] of Object.entries({
+  opportunity_classification: "text not null default 'qualified'",
+  source_tier: "text",
+  qualification_checks: "text default '{}'",
+  manual_review_required: "integer not null default 0",
+  suggested_next_check: "text",
+})) {
+  if (!leadColumns.has(name)) sqlite.exec(`alter table leads add column ${name} ${definition}`);
+}
+
 export function normalizeName(name) {
   return name
     .toLowerCase()
@@ -93,7 +104,14 @@ export async function knownCompanies(resurfaceAfterDays) {
 
 export async function saveLead(lead) {
   const { run_id, ...rest } = lead;
-  const row = { id: randomUUID(), run_id: run_id || null, ...rest, evidence: JSON.stringify(lead.evidence || []) };
+  const row = {
+    id: randomUUID(),
+    run_id: run_id || null,
+    ...rest,
+    evidence: JSON.stringify(lead.evidence || []),
+    qualification_checks: JSON.stringify(lead.qualification_checks || {}),
+    manual_review_required: lead.manual_review_required ? 1 : 0,
+  };
   const keys = Object.keys(row);
   sqlite.prepare(`insert into leads (${keys.join(",")}) values (${keys.map(() => "?").join(",")})`)
     .run(...keys.map((k) => row[k]));
@@ -107,7 +125,12 @@ export async function saveRejection(runId, nameNorm, reason) {
 // --- Tracker queries (sync, used by the local web server) ---
 export function listLeads() {
   return sqlite.prepare(`select * from leads order by created_at desc limit 300`).all()
-    .map((l) => ({ ...l, evidence: JSON.parse(l.evidence || "[]") }));
+    .map((l) => ({
+      ...l,
+      evidence: JSON.parse(l.evidence || "[]"),
+      qualification_checks: JSON.parse(l.qualification_checks || "{}"),
+      manual_review_required: !!l.manual_review_required,
+    }));
 }
 export function lastRun() {
   return sqlite.prepare(`select * from runs order by started_at desc limit 1`).get() || null;
